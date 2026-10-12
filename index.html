@@ -210,8 +210,8 @@ pre.sumtext { margin: 12px 0 0; padding: 10px; background: var(--bg); border: 1p
             <input type="text" id="f-name" autocomplete="name" placeholder="เช่น คุณสมชาย">
           </div>
           <div class="field">
-            <label for="f-phone">เบอร์โทร <span class="hint">ไว้ให้ร้านติดต่อตอนไปส่ง</span></label>
-            <input type="tel" id="f-phone" inputmode="tel" autocomplete="tel" placeholder="08x-xxx-xxxx">
+            <label for="f-phone">ช่องทางติดต่อ <span class="hint">เบอร์โทร หรือ ชื่อ/ID ไลน์</span></label>
+            <input type="text" id="f-phone" autocomplete="off" maxlength="60" placeholder="เช่น 08x-xxx-xxxx หรือ ไลน์: mylineid">
           </div>
         </div>
         <div class="field">
@@ -478,7 +478,7 @@ var API_URL = 'https://script.google.com/macros/s/AKfycbwe8NpmnK7J2YUmmgVbrTK9FJ
     if (!time) { setMsg('เลือกเวลาจัดส่ง (09:00 ถึง 21:00 น.)'); $('f-time').focus(); return; }
     if (!zone) { setMsg('เลือกพื้นที่จัดส่งเพื่อคิดค่าส่ง'); $('f-zone').focus(); return; }
     if (!name) { setMsg('กรอกชื่อผู้รับ'); $('f-name').focus(); return; }
-    if (phone.replace(/\D/g, '').length < 9) { setMsg('กรอกเบอร์โทรให้ครบอย่างน้อย 9 หลัก'); $('f-phone').focus(); return; }
+    if (phone.length < 3) { setMsg('กรอกช่องทางติดต่อ (เบอร์โทร หรือ ID ไลน์)'); $('f-phone').focus(); return; }
     if (!addr) { setMsg('กรอกที่อยู่สำหรับส่ง'); $('f-addr').focus(); return; }
 
     var o = { date: date, time: time, zone: zone, name: name, phone: phone, addr: addr, note: $('f-note').value.trim(), items: JSON.parse(JSON.stringify(cart)) };
@@ -498,7 +498,7 @@ var API_URL = 'https://script.google.com/macros/s/AKfycbwe8NpmnK7J2YUmmgVbrTK9FJ
       '<ul>' + MENU.filter(function (m) { return o.items[m.id]; }).map(function (m) {
         return '<li>' + esc(m.name) + ' × ' + o.items[m.id] + '</li>'; }).join('') + '</ul>' +
       '<div class="pls">' + priceHtml(calc(o.items, o.zone), o.zone) + '</div>' +
-      '<p>ร้านจะติดต่อกลับที่เบอร์ ' + esc(o.phone) + '</p>';
+      '<p>ร้านจะติดต่อกลับทาง ' + esc(o.phone) + '</p>';
     $('form').hidden = true; $('bar').hidden = true; $('done').hidden = false;
     renderAdmin(); window.scrollTo(0, 0);
   }
