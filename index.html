@@ -1,0 +1,687 @@
+<title>C-Wich Orders</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Mitr:wght@400;500&family=IBM+Plex+Sans+Thai:wght@400;500;600&display=swap">
+<style>
+/* Layout: one narrow column (phone first). Customer flow reads top to bottom: pick the day, pick items (with stock), delivery details, price. A second tab shows the owner's delivery board in demo mode. */
+:root {
+  --bg: #F5F7F1;
+  --surface: #FFFFFF;
+  --ink: #1C2619;
+  --muted: #5C6B58;
+  --line: #DDE3D6;
+  --accent: #C65D00;
+  --accent-ink: #FFFFFF;
+  --accent-soft: #FCEBD9;
+  --leaf: #2F6B3F;
+  --leaf-soft: #E3EFE2;
+  --warn: #B3261E;
+  --font-display: "Mitr", "IBM Plex Sans Thai", system-ui, sans-serif;
+  --font-body: "IBM Plex Sans Thai", system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #121712; --surface: #1B221A; --ink: #EEF2E8; --muted: #A3B09E; --line: #2E3A2C;
+    --accent: #FF9A3D; --accent-ink: #1B1200; --accent-soft: #3A2A14;
+    --leaf: #7FCB90; --leaf-soft: #1F3322; --warn: #FF8A80;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #121712; --surface: #1B221A; --ink: #EEF2E8; --muted: #A3B09E; --line: #2E3A2C;
+  --accent: #FF9A3D; --accent-ink: #1B1200; --accent-soft: #3A2A14;
+  --leaf: #7FCB90; --leaf-soft: #1F3322; --warn: #FF8A80;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--ink);
+  font-family: var(--font-body); font-size: 15px; line-height: 1.55;
+  padding-inline: 16px; padding-block: 0 96px;
+}
+.wrap { max-width: 720px; margin-inline: auto; }
+h1, h2, h3 { font-family: var(--font-display); font-weight: 500; margin: 0; text-wrap: balance; }
+button, input, select, textarea { font: inherit; color: inherit; }
+:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+
+.proto {
+  margin-block: 12px 0; padding: 8px 12px; border-radius: 8px;
+  background: var(--accent-soft); color: var(--ink); font-size: 13px;
+}
+header { padding-block: 20px 8px; display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 14px; }
+.brand { font-family: var(--font-display); font-size: 34px; line-height: 1.1; letter-spacing: .01em; }
+.brand span { color: var(--accent); }
+.tagline { color: var(--muted); font-size: 14px; }
+
+.tabs { display: flex; gap: 4px; padding: 4px; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; margin-block: 12px 20px; }
+.tab { flex: 1; min-width: 0; padding: 10px 8px; border: 0; border-radius: 9px; background: transparent; cursor: pointer; font-weight: 500; color: var(--muted); }
+.tab[aria-selected="true"] { background: var(--accent); color: var(--accent-ink); }
+.badge { display: inline-block; min-width: 20px; padding: 0 6px; margin-left: 6px; border-radius: 10px; background: var(--leaf-soft); color: var(--leaf); font-size: 12px; font-weight: 600; }
+.tab[aria-selected="true"] .badge { background: var(--accent-ink); color: var(--accent); }
+
+.panel { display: grid; gap: 20px; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 16px; }
+.card h2 { font-size: 19px; margin-bottom: 4px; }
+.sub { color: var(--muted); font-size: 13px; margin: 0 0 12px; }
+.sub:empty { margin: 0; }
+
+.duo { display: flex; align-items: center; gap: 12px; padding: 10px 12px; margin-bottom: 8px; border-radius: 10px; background: var(--accent-soft); }
+.duo .tag { font-family: var(--font-display); font-size: 15px; color: var(--accent); white-space: nowrap; }
+.duo .txt { font-size: 13px; min-width: 0; }
+
+.group-title { font-family: var(--font-display); font-size: 13px; letter-spacing: .08em; color: var(--leaf); margin: 14px 0 4px; }
+.group-title:first-of-type { margin-top: 4px; }
+.item { display: flex; align-items: center; gap: 12px; padding-block: 10px; border-top: 1px solid var(--line); }
+.group-title + .item { border-top: 0; }
+.item .info { flex: 1; min-width: 0; }
+.item .name { font-weight: 600; }
+.item.out .name { color: var(--muted); }
+.item .price { color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; }
+.stock { font-weight: 600; color: var(--leaf); }
+.stock.low { color: var(--accent); }
+.stock.out { color: var(--warn); }
+.stock.pre { color: var(--accent); }
+.stepper { display: inline-flex; align-items: center; gap: 2px; }
+.stepper button { width: 40px; height: 40px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); font-size: 20px; line-height: 1; cursor: pointer; }
+.stepper button:active { transform: scale(.96); }
+.stepper button:disabled { opacity: .35; cursor: default; }
+.stepper .qty { width: 34px; text-align: center; font-weight: 600; font-variant-numeric: tabular-nums; }
+.item.on .qty { color: var(--accent); }
+
+.field { display: grid; gap: 6px; margin-bottom: 14px; }
+.field:last-child { margin-bottom: 0; }
+.field label { font-weight: 600; font-size: 14px; }
+.field .hint { color: var(--muted); font-size: 12px; font-weight: 400; }
+input[type="text"], input[type="tel"], select, textarea {
+  width: 100%; padding: 11px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg);
+}
+textarea { min-height: 84px; resize: vertical; }
+.cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; margin-bottom: 14px; }
+.cols .field { margin-bottom: 0; }
+.err { color: var(--warn); font-size: 13px; min-height: 1.4em; margin: 10px 0 0; }
+.err.info { color: var(--muted); }
+
+.pl { display: flex; justify-content: space-between; gap: 12px; padding-block: 6px; border-bottom: 1px dashed var(--line); font-variant-numeric: tabular-nums; }
+.pl b { font-weight: 500; white-space: nowrap; }
+.pl.disc b { color: var(--leaf); }
+.pl.muted { color: var(--muted); }
+.pl.total { border-bottom: 0; font-weight: 600; padding-top: 10px; }
+.pl.total b { font-family: var(--font-display); font-size: 20px; color: var(--accent); }
+.pempty { color: var(--muted); font-size: 13px; margin: 0; }
+
+.bar {
+  position: fixed; inset-inline: 0; bottom: 0; z-index: 5;
+  padding: 10px 16px calc(10px + env(safe-area-inset-bottom, 0px));
+  background: var(--surface); border-top: 1px solid var(--line);
+}
+.bar .in { max-width: 720px; margin-inline: auto; display: flex; align-items: center; gap: 12px; }
+.bar .tot { flex: 1; min-width: 0; }
+.bar .tot b { font-family: var(--font-display); font-size: 20px; font-variant-numeric: tabular-nums; }
+.bar .tot small { display: block; color: var(--muted); font-size: 12px; }
+.btn { padding: 12px 20px; border: 0; border-radius: 10px; background: var(--accent); color: var(--accent-ink); font-weight: 600; cursor: pointer; }
+.btn.ghost { background: transparent; color: var(--ink); border: 1px solid var(--line); }
+.btn.small { padding: 8px 12px; font-size: 13px; }
+.btn:disabled { opacity: .5; cursor: default; }
+
+.done h2 { color: var(--leaf); }
+.done ul { margin: 10px 0 14px; padding-left: 18px; }
+.done .pls { margin-bottom: 14px; }
+.oid { font-variant-numeric: tabular-nums; color: var(--muted); font-size: 13px; }
+
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip { padding: 8px 12px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); cursor: pointer; font-size: 13px; }
+.chip[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.chip small { opacity: .7; }
+
+.make { display: grid; gap: 4px; margin: 6px 0 12px; }
+.make-row { display: flex; justify-content: space-between; gap: 12px; padding-block: 6px; border-bottom: 1px dashed var(--line); }
+.make-row b { font-variant-numeric: tabular-nums; }
+.make-total { display: flex; flex-wrap: wrap; gap: 6px 18px; color: var(--muted); font-size: 13px; margin-bottom: 12px; }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.bh { font-family: var(--font-display); font-size: 14px; color: var(--leaf); margin: 12px 0 2px; }
+.bh:first-child { margin-top: 0; }
+pre.sumtext { margin: 12px 0 0; padding: 10px; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; white-space: pre-wrap; font-family: var(--font-body); font-size: 13px; user-select: all; }
+
+.day-h { font-family: var(--font-display); font-size: 15px; color: var(--leaf); margin: 4px 0 -8px; }
+.order { display: grid; gap: 6px; }
+.order.sent { opacity: .62; }
+.order .top { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.order .who { font-weight: 600; }
+.order .tel { color: var(--muted); font-variant-numeric: tabular-nums; font-size: 13px; }
+.order .meta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.order .time { font-family: var(--font-display); font-weight: 500; font-size: 18px; font-variant-numeric: tabular-nums; }
+.order .addr { overflow-wrap: anywhere; }
+.order .what { color: var(--ink); }
+.order .note, .order .placed { color: var(--muted); font-size: 13px; }
+.order .row { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-top: 4px; }
+.order .sum { font-variant-numeric: tabular-nums; color: var(--muted); font-size: 13px; }
+.pill { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; background: var(--accent-soft); color: var(--accent); }
+.pill.ok, .pill.zone { background: var(--leaf-soft); color: var(--leaf); }
+.empty { color: var(--muted); text-align: center; padding: 18px 8px; }
+[hidden] { display: none !important; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+</style>
+
+<div class="wrap">
+  <div class="proto" id="proto">ต้นแบบสำหรับดูหน้าตา สต็อกในหน้านี้เป็นตัวเลขจำลองตามโครงสร้างชีตของคุณ ยังไม่ได้เชื่อมชีตจริงและไม่บันทึกถาวร ถ้ารีเฟรชหน้า ออเดอร์ที่ลองกรอกจะหายไป</div>
+  <header>
+    <h1 class="brand">C-<span>Wich</span></h1>
+    <div class="tagline">แซนวิชและน้ำส้ม สั่งล่วงหน้า ส่งตามที่อยู่</div>
+  </header>
+
+  <div class="tabs" id="tabs" role="tablist" aria-label="เลือกมุมมอง">
+    <button class="tab" role="tab" id="tab-order" aria-selected="true" aria-controls="panel-order">สั่งซื้อ</button>
+    <button class="tab" role="tab" id="tab-admin" aria-selected="false" aria-controls="panel-admin">หน้าร้านดูออเดอร์<span class="badge" id="badge">0</span></button>
+  </div>
+
+  <!-- Customer -->
+  <section class="panel" id="panel-order" role="tabpanel" aria-labelledby="tab-order">
+    <form id="form" novalidate class="panel">
+      <div class="card">
+        <h2>รับของวันไหน</h2>
+        <p class="sub" id="date-sub">สั่งล่วงหน้าได้ 7 วัน วันที่ยังไม่เปิดรับจะเลือกไม่ได้</p>
+        <div class="field">
+          <label for="f-date">วันที่รับของ</label>
+          <select id="f-date"></select>
+        </div>
+        <p class="sub" id="stock-note" role="status"></p>
+      </div>
+
+      <div class="card">
+        <h2>เลือกเมนู</h2>
+        <p class="sub" id="menu-sub">จำนวนที่เหลือเป็นของวันที่เลือกด้านบน</p>
+        <div class="duo"><span class="tag">Duo Set ฿59</span><span class="txt">แซนวิช 1 + น้ำส้ม 1 ลดให้อัตโนมัติ เมื่อเลือกทั้งสองอย่าง</span></div>
+        <div id="menu"></div>
+      </div>
+
+      <div class="card">
+        <h2>ส่งที่ไหน เวลาไหน</h2>
+        <p class="sub">ส่งได้ตั้งแต่ 09:00 ถึง 21:00 น.</p>
+        <div class="cols">
+          <div class="field">
+            <label for="f-time">เวลาจัดส่ง</label>
+            <select id="f-time"></select>
+          </div>
+          <div class="field">
+            <label for="f-zone">พื้นที่จัดส่ง <span class="hint">ค่าส่งต่างกันตามพื้นที่</span></label>
+            <select id="f-zone"></select>
+          </div>
+          <div class="field">
+            <label for="f-name">ชื่อผู้รับ</label>
+            <input type="text" id="f-name" autocomplete="name" placeholder="เช่น คุณสมชาย">
+          </div>
+          <div class="field">
+            <label for="f-phone">เบอร์โทร <span class="hint">ไว้ให้ร้านติดต่อตอนไปส่ง</span></label>
+            <input type="tel" id="f-phone" inputmode="tel" autocomplete="tel" placeholder="08x-xxx-xxxx">
+          </div>
+        </div>
+        <div class="field">
+          <label for="f-addr">ที่อยู่สำหรับส่ง <span class="hint">พิมพ์ตึก ชั้น ห้อง หรือจุดสังเกต</span></label>
+          <textarea id="f-addr" autocomplete="street-address" placeholder="เช่น หอพัก A ห้อง 304 หรือ หน้าร้านกาแฟปากซอย 5"></textarea>
+        </div>
+        <div class="field">
+          <label for="f-note">หมายเหตุ <span class="hint">ไม่บังคับ</span></label>
+          <input type="text" id="f-note" placeholder="เช่น ไม่ใส่ซอสพริก">
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>สรุปราคา</h2>
+        <div id="price"></div>
+        <p class="err" id="err" role="alert"></p>
+      </div>
+    </form>
+
+    <div class="card done" id="done" hidden>
+      <h2>รับออเดอร์แล้ว</h2>
+      <div id="done-body"></div>
+      <button class="btn ghost" type="button" id="again">สั่งเพิ่มอีกออเดอร์</button>
+    </div>
+  </section>
+
+  <!-- Owner (demo mode only) -->
+  <section class="panel" id="panel-admin" role="tabpanel" aria-labelledby="tab-admin" hidden>
+    <div class="card">
+      <h2>สต็อกในชีต (จำลอง)</h2>
+      <p class="sub">ตัวเลขนี้ลดลงทันทีเมื่อมีออเดอร์ เหมือนที่จะเกิดในชีตจริง แยกตามล็อตที่ใช้ส่งหลายวันร่วมกัน</p>
+      <div id="sheet-stock"></div>
+    </div>
+    <div class="card">
+      <h2>เลือกวันที่ต้องส่ง</h2>
+      <p class="sub">ใช้ดูว่าต้องทำกี่ชิ้นและส่งที่ไหน เวลาไหนบ้าง</p>
+      <div class="chips" id="chips"></div>
+    </div>
+    <div class="card" id="make-card">
+      <h2 id="make-title">ที่ต้องทำ</h2>
+      <div class="make" id="make"></div>
+      <div class="make-total" id="make-total"></div>
+      <div class="actions">
+        <button class="btn small" type="button" id="copy">คัดลอกสรุป</button>
+      </div>
+      <pre class="sumtext" id="sumtext" hidden></pre>
+      <p class="sub" id="copy-msg" style="margin:8px 0 0" role="status"></p>
+    </div>
+    <div id="orders" class="panel"></div>
+  </section>
+</div>
+
+<div class="bar" id="bar">
+  <div class="in">
+    <div class="tot"><b id="bar-total">฿0</b><small id="bar-count">ยังไม่ได้เลือกสินค้า</small></div>
+    <button class="btn" type="submit" form="form" id="submit">ส่งออเดอร์</button>
+  </div>
+</div>
+
+<script>
+// วาง URL ของ Apps Script Web app (ลงท้ายด้วย /exec) ตรงนี้เมื่อนำหน้านี้ไปโฮสต์ของจริง
+// ปล่อยว่าง = โหมดจำลอง (สต็อกตัวอย่างอยู่ในหน้านี้ ไม่แตะชีตจริง)
+var API_URL = 'https://script.google.com/macros/s/AKfycbwe8NpmnK7J2YUmmgVbrTK9FJZM4tJh0CGsE86V21jvIeD15HskenAAoigIZvmW216ZBQ/exec';
+
+(function () {
+  var LIVE = !!API_URL;
+  var SW = 35, OJ = 30, DUO = 59;
+  var DUO_SAVE = SW + OJ - DUO;
+  var MENU = [
+    { id: 'ph', kind: 'sw', group: 'แซนวิช', name: 'ปูอัด+แฮม', price: SW },
+    { id: 'ps', kind: 'sw', group: 'แซนวิช', name: 'ปูอัด+ไส้กรอก', price: SW },
+    { id: 'pe', kind: 'sw', group: 'แซนวิช', name: 'ปูอัด+ไข่', price: SW },
+    { id: 'hs', kind: 'sw', group: 'แซนวิช', name: 'แฮม+ไส้กรอก', price: SW },
+    { id: 'he', kind: 'sw', group: 'แซนวิช', name: 'แฮม+ไข่', price: SW },
+    { id: 'se', kind: 'sw', group: 'แซนวิช', name: 'ไส้กรอก+ไข่', price: SW },
+    { id: 'oj', kind: 'dr', group: 'เครื่องดื่ม', name: 'น้ำส้ม', price: OJ }
+  ];
+  var ZONES = { gs: { name: 'กังสดาล', fee: 5 }, mo: { name: 'หลังมอ', fee: 10 }, city: { name: 'ในเมือง', fee: 15 } };
+  var ZONE_ORDER = ['gs', 'mo', 'city'];
+  var BY_ID = {}; MENU.forEach(function (m) { BY_ID[m.id] = m; });
+
+  function esc(s) { return String(s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+  function baht(n) { return '฿' + String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ','); }
+  function $(id) { return document.getElementById(id); }
+  function pad2(n) { return String(n).padStart(2, '0'); }
+
+  /* ---------- dates ---------- */
+  function startOf(d) { var x = new Date(d); x.setHours(0, 0, 0, 0); return x; }
+  function key(d) { return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate()); }
+  function label(k) {
+    var p = k.split('-').map(Number);
+    return new Date(p[0], p[1] - 1, p[2]).toLocaleDateString('th-TH', { weekday: 'short', day: 'numeric', month: 'short' });
+  }
+  var TODAY = startOf(new Date());
+  function dayKey(offset) { return key(new Date(TODAY.getFullYear(), TODAY.getMonth(), TODAY.getDate() + offset)); }
+  function stamp(offset, h, m) { return new Date(TODAY.getFullYear(), TODAY.getMonth(), TODAY.getDate() + offset, h, m).getTime(); }
+  function placedText(ts) {
+    var d = new Date(ts);
+    return d.toLocaleDateString('th-TH', { day: 'numeric', month: 'short' }) + ' ' + pad2(d.getHours()) + ':' + pad2(d.getMinutes()) + ' น.';
+  }
+
+  /* ---------- pricing (display only; the server recomputes) ---------- */
+  function calc(items, zoneId) {
+    var sw = 0, oj = 0, base = 0;
+    MENU.forEach(function (m) {
+      var q = items[m.id] || 0; if (!q) return;
+      base += q * m.price;
+      if (m.kind === 'sw') sw += q; else oj += q;
+    });
+    var duo = Math.min(sw, oj), disc = duo * DUO_SAVE;
+    var fee = (sw + oj) > 0 && ZONES[zoneId] ? ZONES[zoneId].fee : 0;
+    return { sw: sw, oj: oj, n: sw + oj, base: base, duo: duo, disc: disc, fee: fee, total: base - disc + fee };
+  }
+  function line(l, r, cls) { return '<div class="pl ' + (cls || '') + '"><span>' + l + '</span><b>' + r + '</b></div>'; }
+  function priceHtml(c, zoneId) {
+    if (!c.n) return '<p class="pempty">เลือกสินค้าแล้วราคาจะแสดงที่นี่</p>';
+    var h = '';
+    if (c.sw) h += line('แซนวิช ' + c.sw + ' × ' + baht(SW), baht(c.sw * SW));
+    if (c.oj) h += line('น้ำส้ม ' + c.oj + ' × ' + baht(OJ), baht(c.oj * OJ));
+    if (c.duo) h += line('ส่วนลด Duo Set ' + c.duo + ' ชุด (ชุดละ ' + baht(DUO) + ')', '−' + baht(c.disc), 'disc');
+    if (ZONES[zoneId]) h += line('ค่าส่ง ' + ZONES[zoneId].name, '+' + baht(c.fee));
+    else h += line('ค่าส่ง', 'เลือกพื้นที่ส่งก่อน', 'muted');
+    h += line('รวมทั้งหมด', baht(c.total), 'total');
+    return h;
+  }
+
+  /* ---------- state ---------- */
+  var seq = 3;
+  var orders = [   // demo mode only
+    { id: 1, created: stamp(-1, 18, 20), date: dayKey(1), time: '12:30', zone: 'gs', name: 'ตัวอย่าง: พี่ฟ้า', phone: '081-000-0001', addr: 'หอพัก A ห้อง 304', note: '', items: { ph: 2, he: 1, oj: 2 }, sent: false },
+    { id: 2, created: stamp(-1, 21, 5), date: dayKey(1), time: '17:00', zone: 'mo', name: 'ตัวอย่าง: น้องมิว', phone: '082-000-0002', addr: 'อาคารเรียน 2 ชั้น 1 หน้าห้องธุรการ', note: 'ไม่ใส่ซอสพริก', items: { se: 3, oj: 1 }, sent: false },
+    { id: 3, created: stamp(0, 1, 10), date: dayKey(2), time: '09:30', zone: 'city', name: 'ตัวอย่าง: คุณเบน', phone: '083-000-0003', addr: 'ร้านกาแฟหน้าปากซอย 5', note: '', items: { ps: 4, ph: 2 }, sent: false }
+  ];
+  // Demo stock, shaped like the sheet: one batch ("ล็อต") feeds several delivery days and its remaining is shared.
+  var mockBatches = [
+    { dates: [dayKey(1), dayKey(2)], items: { ph: 5, ps: 3, pe: 0, hs: 4, he: 2, se: 6, oj: 8 } },
+    // next lot: nothing received yet, so these days run as pre-orders (remaining goes negative = to make)
+    { dates: [dayKey(3), dayKey(4), dayKey(5), dayKey(6)], preorder: true, items: { ph: 0, ps: 0, pe: 0, hs: 0, he: 0, se: 0, oj: 0 } }
+  ];
+
+  var stock = null;           // { dates: { 'yyyy-mm-dd': { opened: bool, items: { id: remaining } } } }
+  var cart = {};
+  var adminDay = 'all';
+  var busy = false;
+
+  /* ---------- data access: demo or the real Apps Script backend ---------- */
+  var api = {
+    getStock: function () {
+      if (!LIVE) {
+        var dates = {};
+        mockBatches.forEach(function (b) { b.dates.forEach(function (k) { dates[k] = { opened: true, preorder: !!b.preorder, items: b.items }; }); });
+        return Promise.resolve({ dates: dates });
+      }
+      return fetch(API_URL + (API_URL.indexOf('?') >= 0 ? '&' : '?') + 'action=stock')
+        .then(function (r) { return r.json(); })
+        .then(function (j) {
+          if (!j || !j.ok) throw new Error('stock');
+          var dates = {};
+          Object.keys(j.dates).forEach(function (k) {
+            var items = {};
+            MENU.forEach(function (m) { items[m.id] = Number(j.dates[k].items[m.name]) || 0; });
+            dates[k] = { opened: !!j.dates[k].opened, preorder: !!j.dates[k].preorder, items: items };
+          });
+          return { dates: dates };
+        });
+    },
+    placeOrder: function (o) {
+      if (!LIVE) return Promise.resolve(mockPlace(o));
+      var named = {};
+      Object.keys(o.items).forEach(function (id) { named[BY_ID[id].name] = o.items[id]; });
+      var payload = { action: 'order', date: o.date, time: o.time, zone: o.zone, name: o.name, phone: o.phone, addr: o.addr, note: o.note, items: named };
+      return fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(payload) })
+        .then(function (r) { return r.json(); });
+    }
+  };
+  function mockPlace(o) {
+    var d = stock.dates[o.date];
+    if (!d || !d.opened) return { ok: false, error: 'DATE_CLOSED' };
+    var short = [];
+    Object.keys(o.items).forEach(function (id) {
+      if (!d.preorder && o.items[id] > (d.items[id] || 0)) short.push({ name: BY_ID[id].name, requested: o.items[id], available: d.items[id] || 0 });
+    });
+    if (short.length) return { ok: false, error: 'INSUFFICIENT', shortages: short };
+    Object.keys(o.items).forEach(function (id) { d.items[id] -= o.items[id]; });
+    var rec = { id: ++seq, created: Date.now(), date: o.date, time: o.time, zone: o.zone, name: o.name, phone: o.phone, addr: o.addr, note: o.note, items: JSON.parse(JSON.stringify(o.items)), sent: false };
+    orders.push(rec);
+    return { ok: true, orderId: 'ทดสอบ-' + rec.id };
+  }
+
+  /* ---------- customer: selects ---------- */
+  (function () {
+    var t = '<option value="">เลือกเวลา</option>';
+    for (var h = 9; h <= 21; h++) {
+      ['00', '30'].forEach(function (m) {
+        if (h === 21 && m === '30') return;
+        t += '<option value="' + pad2(h) + ':' + m + '">' + pad2(h) + ':' + m + ' น.</option>';
+      });
+    }
+    $('f-time').innerHTML = t;
+    var z = '<option value="">เลือกพื้นที่ส่ง</option>';
+    ZONE_ORDER.forEach(function (id) { z += '<option value="' + id + '">' + esc(ZONES[id].name) + ' (+' + baht(ZONES[id].fee) + ')</option>'; });
+    $('f-zone').innerHTML = z;
+  })();
+
+  function buildDates(keep) {
+    var html = '', first = '';
+    for (var i = 1; i <= 7; i++) {
+      var k = dayKey(i), d = stock.dates[k], open = !!(d && d.opened);
+      if (open && !first) first = k;
+      html += '<option value="' + k + '"' + (open ? '' : ' disabled') + '>' + esc(label(k)) + (open ? '' : ' (ยังไม่เปิดรับ)') + '</option>';
+    }
+    $('f-date').innerHTML = html;
+    var want = (keep && stock.dates[keep] && stock.dates[keep].opened) ? keep : first;
+    if (want) $('f-date').value = want;
+    $('submit').disabled = !first;
+    $('date-sub').textContent = first ? 'สั่งล่วงหน้าได้ 7 วัน วันที่ยังไม่เปิดรับจะเลือกไม่ได้' : 'ตอนนี้ยังไม่เปิดรับออเดอร์ในช่วง 7 วันข้างหน้า';
+  }
+  function remainingOf(id) {
+    var d = stock && stock.dates[$('f-date').value];
+    return d && d.opened ? (d.items[id] || 0) : 0;
+  }
+  var PRE_MAX = 20;   // per item, per order, on pre-order days
+  function isPre() { var d = stock && stock.dates[$('f-date').value]; return !!(d && d.opened && d.preorder); }
+  function capOf(id) { return isPre() ? PRE_MAX : remainingOf(id); }
+  function clampCart() {
+    var changed = false;
+    MENU.forEach(function (m) {
+      var q = cart[m.id] || 0; if (!q) return;
+      var r = capOf(m.id);
+      if (q > r) { changed = true; if (r > 0) cart[m.id] = r; else delete cart[m.id]; }
+    });
+    $('stock-note').textContent = changed ? 'ปรับจำนวนตามของที่เหลือของวันที่เลือกแล้ว' : '';
+  }
+
+  /* ---------- customer: menu ---------- */
+  function renderMenu() {
+    if (!stock) { $('menu').innerHTML = '<p class="sub">กำลังโหลดสต็อก...</p>'; updateBar(); return; }
+    $('menu-sub').textContent = isPre() ? 'วันนี้รับสั่งล่วงหน้า ถ้าของไม่พอร้านจะทำเพิ่มให้ตามออเดอร์' : 'จำนวนที่เหลือเป็นของวันที่เลือกด้านบน';
+    var html = '', lastGroup = '';
+    MENU.forEach(function (m) {
+      if (m.group !== lastGroup) { html += '<div class="group-title">' + esc(m.group) + '</div>'; lastGroup = m.group; }
+      var q = cart[m.id] || 0, r = remainingOf(m.id), pre = isPre(), out = !pre && r <= 0, cap = capOf(m.id);
+      html += '<div class="item' + (q ? ' on' : '') + (out ? ' out' : '') + '" data-id="' + m.id + '">' +
+        '<div class="info"><div class="name">' + esc(m.name) + '</div>' +
+        '<div class="price">' + baht(m.price) + ' ต่อชิ้น · <span class="stock ' + (out ? 'out' : (r <= 0 ? 'pre' : (r <= 3 ? 'low' : ''))) + '">' + (out ? 'หมด' : (r <= 0 ? 'สั่งล่วงหน้า' : 'เหลือ ' + r + ' ชิ้น')) + '</span></div></div>' +
+        '<div class="stepper"><button type="button" data-act="dec" aria-label="ลด ' + esc(m.name) + '"' + (q ? '' : ' disabled') + '>−</button>' +
+        '<span class="qty" aria-live="polite">' + q + '</span>' +
+        '<button type="button" data-act="inc" aria-label="เพิ่ม ' + esc(m.name) + '"' + (q >= cap ? ' disabled' : '') + '>+</button></div></div>';
+    });
+    $('menu').innerHTML = html;
+    updateBar();
+  }
+  function updateBar() {
+    var zone = $('f-zone').value, c = calc(cart, zone);
+    $('bar-total').textContent = baht(c.total);
+    var small;
+    if (!c.n) small = 'ยังไม่ได้เลือกสินค้า';
+    else {
+      small = c.n + ' ชิ้น';
+      if (c.duo) small += ' · Duo Set ' + c.duo + ' ชุด';
+      small += ZONES[zone] ? ' · ค่าส่ง ' + baht(c.fee) : ' · ยังไม่ได้เลือกพื้นที่ส่ง';
+    }
+    $('bar-count').textContent = small;
+    $('price').innerHTML = priceHtml(c, zone);
+  }
+  $('menu').addEventListener('click', function (e) {
+    if (e.target.id === 'retry') { load(); return; }
+    var btn = e.target.closest('button[data-act]'); if (!btn || btn.disabled) return;
+    var row = btn.closest('.item'), id = row.getAttribute('data-id');
+    var q = cart[id] || 0;
+    q = btn.getAttribute('data-act') === 'inc' ? Math.min(q + 1, capOf(id)) : Math.max(q - 1, 0);
+    if (q) cart[id] = q; else delete cart[id];
+    $('stock-note').textContent = '';
+    renderMenu();
+    var again = $('menu').querySelector('.item[data-id="' + id + '"] button[data-act="' + btn.getAttribute('data-act') + '"]');
+    if (again && !again.disabled) again.focus();
+  });
+  $('f-zone').addEventListener('change', updateBar);
+  $('f-date').addEventListener('change', function () { clampCart(); renderMenu(); });
+
+  function itemsText(items) {
+    return MENU.filter(function (m) { return items[m.id]; })
+      .map(function (m) { return m.name + ' × ' + items[m.id]; }).join(', ');
+  }
+
+  /* ---------- customer: load + submit ---------- */
+  function load(keepDate) {
+    stock = null; renderMenu();
+    return api.getStock().then(function (s) {
+      stock = s; buildDates(keepDate); clampCart(); renderMenu(); renderAdmin();
+    }).catch(function () {
+      $('menu').innerHTML = '<p class="err">โหลดสต็อกไม่ได้ ตรวจอินเทอร์เน็ตแล้วลองใหม่</p><button class="btn small" type="button" id="retry">ลองใหม่</button>';
+    });
+  }
+  function setMsg(text, info) { var e = $('err'); e.textContent = text; e.classList.toggle('info', !!info); }
+  function failText(res) {
+    if (res && res.error === 'INSUFFICIENT' && res.shortages) {
+      return 'ของไม่พอ: ' + res.shortages.map(function (s) { return s.name + ' เหลือ ' + s.available + ' ชิ้น'; }).join(', ') + ' กรุณาปรับจำนวนแล้วส่งใหม่';
+    }
+    if (res && res.error === 'DATE_CLOSED') return 'วันที่เลือกยังไม่เปิดรับออเดอร์ กรุณาเลือกวันอื่น';
+    if (res && res.message) return res.message;
+    return 'ส่งออเดอร์ไม่สำเร็จ ลองใหม่อีกครั้ง';
+  }
+
+  $('form').addEventListener('submit', function (e) {
+    e.preventDefault();
+    if (busy || !stock) return;
+    var c = calc(cart, $('f-zone').value);
+    var date = $('f-date').value, time = $('f-time').value, zone = $('f-zone').value;
+    var name = $('f-name').value.trim(), phone = $('f-phone').value.trim(), addr = $('f-addr').value.trim();
+    if (!date) { setMsg('เลือกวันที่รับของ'); return; }
+    if (!c.n) { setMsg('เลือกสินค้าอย่างน้อย 1 ชิ้นก่อนส่งออเดอร์'); return; }
+    if (!time) { setMsg('เลือกเวลาจัดส่ง (09:00 ถึง 21:00 น.)'); $('f-time').focus(); return; }
+    if (!zone) { setMsg('เลือกพื้นที่จัดส่งเพื่อคิดค่าส่ง'); $('f-zone').focus(); return; }
+    if (!name) { setMsg('กรอกชื่อผู้รับ'); $('f-name').focus(); return; }
+    if (phone.replace(/\D/g, '').length < 9) { setMsg('กรอกเบอร์โทรให้ครบอย่างน้อย 9 หลัก'); $('f-phone').focus(); return; }
+    if (!addr) { setMsg('กรอกที่อยู่สำหรับส่ง'); $('f-addr').focus(); return; }
+
+    var o = { date: date, time: time, zone: zone, name: name, phone: phone, addr: addr, note: $('f-note').value.trim(), items: JSON.parse(JSON.stringify(cart)) };
+    busy = true; $('submit').disabled = true; setMsg('กำลังส่งออเดอร์...', true);
+    api.placeOrder(o).then(function (res) {
+      busy = false; $('submit').disabled = false;
+      if (res && res.ok) { setMsg(''); showDone(o, res); }
+      else { setMsg(failText(res)); load(date); }
+    }).catch(function () {
+      busy = false; $('submit').disabled = false; setMsg('ส่งออเดอร์ไม่สำเร็จ ตรวจอินเทอร์เน็ตแล้วลองใหม่');
+    });
+  });
+  function showDone(o, res) {
+    $('done-body').innerHTML =
+      '<p class="oid">เลขที่ออเดอร์ ' + esc(res.orderId || '') + '</p>' +
+      '<p>ส่งวัน <b>' + esc(label(o.date)) + '</b> เวลา <b>' + o.time + ' น.</b><br>พื้นที่ ' + esc(ZONES[o.zone].name) + ' · ' + esc(o.addr) + '</p>' +
+      '<ul>' + MENU.filter(function (m) { return o.items[m.id]; }).map(function (m) {
+        return '<li>' + esc(m.name) + ' × ' + o.items[m.id] + '</li>'; }).join('') + '</ul>' +
+      '<div class="pls">' + priceHtml(calc(o.items, o.zone), o.zone) + '</div>' +
+      '<p>ร้านจะติดต่อกลับที่เบอร์ ' + esc(o.phone) + '</p>';
+    $('form').hidden = true; $('bar').hidden = true; $('done').hidden = false;
+    renderAdmin(); window.scrollTo(0, 0);
+  }
+  $('again').addEventListener('click', function () {
+    cart = {};
+    $('f-note').value = ''; $('f-time').value = ''; $('f-zone').value = '';
+    $('done').hidden = true; $('form').hidden = false; $('bar').hidden = false;
+    load(); window.scrollTo(0, 0);
+  });
+
+  /* ---------- owner view (demo mode) ---------- */
+  function scopeOrders() {
+    return orders.filter(function (o) { return adminDay === 'all' || o.date === adminDay; })
+      .sort(function (a, b) {
+        if (a.date !== b.date) return a.date < b.date ? -1 : 1;
+        if (a.time !== b.time) return a.time < b.time ? -1 : 1;
+        return a.id - b.id;
+      });
+  }
+  function renderAdmin() {
+    if (LIVE) return;
+    $('badge').textContent = orders.filter(function (o) { return !o.sent; }).length;
+
+    $('sheet-stock').innerHTML = mockBatches.map(function (b) {
+      return '<div class="bh">ล็อตที่ใช้ส่งวัน ' + b.dates.map(label).map(esc).join(', ') + '</div>' +
+        MENU.map(function (m) {
+          var v = b.items[m.id] || 0;
+          return '<div class="make-row"><span>' + esc(m.name) + '</span><b>' + (v < 0 ? '−' + (-v) + ' ชิ้น (ต้องทำเพิ่ม)' : v + ' ชิ้น') + '</b></div>';
+        }).join('');
+    }).join('');
+
+    var dates = []; orders.forEach(function (o) { if (dates.indexOf(o.date) < 0) dates.push(o.date); });
+    dates.sort();
+    if (adminDay !== 'all' && dates.indexOf(adminDay) < 0) adminDay = 'all';
+    var chips = '<button class="chip" type="button" data-day="all" aria-pressed="' + (adminDay === 'all') + '">ทั้งหมด <small>' + orders.length + ' ออเดอร์</small></button>';
+    dates.forEach(function (d) {
+      var n = orders.filter(function (o) { return o.date === d; }).length;
+      chips += '<button class="chip" type="button" data-day="' + d + '" aria-pressed="' + (adminDay === d) + '">' + esc(label(d)) + ' <small>' + n + ' ออเดอร์</small></button>';
+    });
+    $('chips').innerHTML = chips;
+
+    var list = scopeOrders();
+    var totals = {}, pieces = 0, money = 0, fees = 0, duos = 0, sentN = 0;
+    list.forEach(function (o) {
+      if (o.sent) sentN++;
+      var c = calc(o.items, o.zone);
+      money += c.total; fees += c.fee; duos += c.duo; pieces += c.n;
+      MENU.forEach(function (m) { var q = o.items[m.id] || 0; if (q) totals[m.id] = (totals[m.id] || 0) + q; });
+    });
+    $('make-title').textContent = 'ที่ต้องทำ' + (adminDay === 'all' ? 'ทั้งหมด' : ' ' + label(adminDay));
+    $('make').innerHTML = pieces ? MENU.filter(function (m) { return totals[m.id]; }).map(function (m) {
+      return '<div class="make-row"><span>' + esc(m.name) + '</span><b>' + totals[m.id] + ' ชิ้น</b></div>';
+    }).join('') : '<div class="empty">ยังไม่มีออเดอร์ในวันนี้</div>';
+    $('make-total').innerHTML = '<span>รวม ' + pieces + ' ชิ้น</span>' +
+      (duos ? '<span>Duo Set ' + duos + ' ชุด</span>' : '') +
+      '<span>ค่าส่ง ' + baht(fees) + '</span><span>ยอดรวม ' + baht(money) + '</span>' +
+      '<span>ส่งแล้ว ' + sentN + '/' + list.length + ' ออเดอร์</span>';
+    $('copy').disabled = !pieces;
+    $('sumtext').hidden = true; $('copy-msg').textContent = '';
+
+    var html = '', last = '';
+    list.forEach(function (o) {
+      var c = calc(o.items, o.zone);
+      if (o.date !== last) { html += '<div class="day-h">ส่ง ' + esc(label(o.date)) + '</div>'; last = o.date; }
+      html += '<div class="card order' + (o.sent ? ' sent' : '') + '" data-id="' + o.id + '">' +
+        '<div class="meta"><b class="time">' + o.time + ' น.</b><span class="pill zone">' + esc(ZONES[o.zone].name) + '</span></div>' +
+        '<div class="top"><span class="who">' + esc(o.name) + '</span><span class="tel">' + esc(o.phone) + '</span></div>' +
+        '<div class="addr">' + esc(o.addr) + '</div>' +
+        '<div class="what">' + esc(itemsText(o.items)) + (c.duo ? ' (Duo Set ' + c.duo + ' ชุด)' : '') + '</div>' +
+        (o.note ? '<div class="note">หมายเหตุ: ' + esc(o.note) + '</div>' : '') +
+        '<div class="placed">สั่งเมื่อ ' + esc(placedText(o.created)) + '</div>' +
+        '<div class="row"><span class="sum">' + baht(c.total) + ' (ค่าส่ง ' + baht(c.fee) + ') · ' + (o.sent ? '<span class="pill ok">ส่งแล้ว</span>' : '<span class="pill">รอส่ง</span>') + '</span>' +
+        '<button class="btn small ghost" type="button" data-act="toggle" aria-pressed="' + o.sent + '">' + (o.sent ? 'ยกเลิกสถานะส่งแล้ว' : 'ทำเครื่องหมายว่าส่งแล้ว') + '</button></div></div>';
+    });
+    $('orders').innerHTML = html;
+  }
+  $('chips').addEventListener('click', function (e) {
+    var b = e.target.closest('.chip'); if (!b) return;
+    adminDay = b.getAttribute('data-day'); renderAdmin();
+  });
+  $('orders').addEventListener('click', function (e) {
+    var b = e.target.closest('button[data-act="toggle"]'); if (!b) return;
+    var id = Number(b.closest('.order').getAttribute('data-id'));
+    orders.forEach(function (o) { if (o.id === id) o.sent = !o.sent; });
+    renderAdmin();
+  });
+
+  function summaryText() {
+    var list = scopeOrders(), lines = [];
+    var dates = []; list.forEach(function (o) { if (dates.indexOf(o.date) < 0) dates.push(o.date); });
+    dates.forEach(function (d) {
+      var tot = {}; var os = list.filter(function (o) { return o.date === d; });
+      os.forEach(function (o) { MENU.forEach(function (m) { if (o.items[m.id]) tot[m.id] = (tot[m.id] || 0) + o.items[m.id]; }); });
+      lines.push('ส่ง ' + label(d) + ' (' + os.length + ' ออเดอร์)');
+      MENU.forEach(function (m) { if (tot[m.id]) lines.push('- ' + m.name + ' ' + tot[m.id] + ' ชิ้น'); });
+      os.forEach(function (o) { lines.push('• ' + o.time + ' น. ' + o.name + ' ' + o.phone + ' | ' + ZONES[o.zone].name + ' ' + o.addr); });
+      lines.push('');
+    });
+    return lines.join('\n').trim();
+  }
+  $('copy').addEventListener('click', function () {
+    var text = summaryText(), pre = $('sumtext');
+    function fallback() {
+      pre.textContent = text; pre.hidden = false;
+      var r = document.createRange(); r.selectNodeContents(pre);
+      var s = window.getSelection(); s.removeAllRanges(); s.addRange(r);
+      $('copy-msg').textContent = 'คัดลอกอัตโนมัติไม่ได้ ข้อความถูกเลือกไว้แล้ว กดคัดลอกจากเมนูของเครื่อง';
+    }
+    try {
+      navigator.clipboard.writeText(text).then(function () { $('copy-msg').textContent = 'คัดลอกสรุปแล้ว'; }, fallback);
+    } catch (err) { fallback(); }
+  });
+
+  /* ---------- tabs ---------- */
+  function showTab(which) {
+    var admin = which === 'admin';
+    $('tab-order').setAttribute('aria-selected', String(!admin));
+    $('tab-admin').setAttribute('aria-selected', String(admin));
+    $('panel-order').hidden = admin; $('panel-admin').hidden = !admin;
+    $('bar').hidden = admin || !$('done').hidden;
+    window.scrollTo(0, 0);
+  }
+  $('tab-order').addEventListener('click', function () { showTab('order'); });
+  $('tab-admin').addEventListener('click', function () { showTab('admin'); });
+
+  /* ---------- start ---------- */
+  if (LIVE) {
+    // Hosted version: customers only. The owner reads orders in the sheet's "ออเดอร์" tab and the LINE alerts.
+    $('proto').hidden = true; $('tabs').hidden = true; $('panel-admin').hidden = true;
+  } else {
+    var ds = orders.map(function (o) { return o.date; }).sort();
+    if (ds.length) adminDay = ds[0];
+  }
+  load();
+})();
+</script>
