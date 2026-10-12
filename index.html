@@ -163,7 +163,7 @@ pre.sumtext { margin: 12px 0 0; padding: 10px; background: var(--bg); border: 1p
 </style>
 
 <div class="wrap">
-  <div class="proto" id="proto">ต้นแบบสำหรับดูหน้าตา สต็อกในหน้านี้เป็นตัวเลขจำลองตามโครงสร้างชีตของคุณ ยังไม่ได้เชื่อมชีตจริงและไม่บันทึกถาวร ถ้ารีเฟรชหน้า ออเดอร์ที่ลองกรอกจะหายไป</div>
+  <div class="proto" id="proto">ต้นแบบสำหรับดูหน้าตา ยังไม่ได้ส่งออเดอร์จริงและไม่บันทึกถาวร ถ้ารีเฟรชหน้า ออเดอร์ที่ลองกรอกจะหายไป</div>
   <header>
     <h1 class="brand">C-<span>Wich</span></h1>
     <div class="tagline">แซนวิชและน้ำส้ม สั่งล่วงหน้า ส่งตามที่อยู่</div>
@@ -179,24 +179,23 @@ pre.sumtext { margin: 12px 0 0; padding: 10px; background: var(--bg); border: 1p
     <form id="form" novalidate class="panel">
       <div class="card">
         <h2>รับของวันไหน</h2>
-        <p class="sub" id="date-sub">สั่งล่วงหน้าได้ 7 วัน วันที่ยังไม่เปิดรับจะเลือกไม่ได้</p>
+        <p class="sub" id="date-sub">สั่งส่งวันนี้หรือสั่งล่วงหน้าได้ 7 วัน</p>
         <div class="field">
           <label for="f-date">วันที่รับของ</label>
           <select id="f-date"></select>
         </div>
-        <p class="sub" id="stock-note" role="status"></p>
       </div>
 
       <div class="card">
         <h2>เลือกเมนู</h2>
-        <p class="sub" id="menu-sub">จำนวนที่เหลือเป็นของวันที่เลือกด้านบน</p>
+        <p class="sub" id="menu-sub">เลือกจำนวนที่ต้องการ</p>
         <div class="duo"><span class="tag">Duo Set ฿59</span><span class="txt">แซนวิช 1 + น้ำส้ม 1 ลดให้อัตโนมัติ เมื่อเลือกทั้งสองอย่าง</span></div>
         <div id="menu"></div>
       </div>
 
       <div class="card">
         <h2>ส่งที่ไหน เวลาไหน</h2>
-        <p class="sub">ส่งได้ตั้งแต่ 09:00 ถึง 21:00 น.</p>
+        <p class="sub" id="time-sub">ส่งได้ตั้งแต่ 09:00 ถึง 21:00 น.</p>
         <div class="cols">
           <div class="field">
             <label for="f-time">เวลาจัดส่ง</label>
@@ -241,11 +240,6 @@ pre.sumtext { margin: 12px 0 0; padding: 10px; background: var(--bg); border: 1p
 
   <!-- Owner (demo mode only) -->
   <section class="panel" id="panel-admin" role="tabpanel" aria-labelledby="tab-admin" hidden>
-    <div class="card">
-      <h2>สต็อกในชีต (จำลอง)</h2>
-      <p class="sub">ตัวเลขนี้ลดลงทันทีเมื่อมีออเดอร์ เหมือนที่จะเกิดในชีตจริง แยกตามล็อตที่ใช้ส่งหลายวันร่วมกัน</p>
-      <div id="sheet-stock"></div>
-    </div>
     <div class="card">
       <h2>เลือกวันที่ต้องส่ง</h2>
       <p class="sub">ใช้ดูว่าต้องทำกี่ชิ้นและส่งที่ไหน เวลาไหนบ้าง</p>
@@ -346,39 +340,12 @@ var API_URL = 'https://script.google.com/macros/s/AKfycbwe8NpmnK7J2YUmmgVbrTK9FJ
     { id: 2, created: stamp(-1, 21, 5), date: dayKey(1), time: '17:00', zone: 'mo', name: 'ตัวอย่าง: น้องมิว', phone: '082-000-0002', addr: 'อาคารเรียน 2 ชั้น 1 หน้าห้องธุรการ', note: 'ไม่ใส่ซอสพริก', items: { se: 3, oj: 1 }, sent: false },
     { id: 3, created: stamp(0, 1, 10), date: dayKey(2), time: '09:30', zone: 'city', name: 'ตัวอย่าง: คุณเบน', phone: '083-000-0003', addr: 'ร้านกาแฟหน้าปากซอย 5', note: '', items: { ps: 4, ph: 2 }, sent: false }
   ];
-  // Demo stock, shaped like the sheet: one batch ("ล็อต") feeds several delivery days and its remaining is shared.
-  var mockBatches = [
-    { dates: [dayKey(1), dayKey(2)], items: { ph: 5, ps: 3, pe: 0, hs: 4, he: 2, se: 6, oj: 8 } },
-    // next lot: nothing received yet, so these days run as pre-orders (remaining goes negative = to make)
-    { dates: [dayKey(3), dayKey(4), dayKey(5), dayKey(6)], preorder: true, items: { ph: 0, ps: 0, pe: 0, hs: 0, he: 0, se: 0, oj: 0 } }
-  ];
-
-  var stock = null;           // { dates: { 'yyyy-mm-dd': { opened: bool, items: { id: remaining } } } }
   var cart = {};
   var adminDay = 'all';
   var busy = false;
 
   /* ---------- data access: demo or the real Apps Script backend ---------- */
   var api = {
-    getStock: function () {
-      if (!LIVE) {
-        var dates = {};
-        mockBatches.forEach(function (b) { b.dates.forEach(function (k) { dates[k] = { opened: true, preorder: !!b.preorder, items: b.items }; }); });
-        return Promise.resolve({ dates: dates });
-      }
-      return fetch(API_URL + (API_URL.indexOf('?') >= 0 ? '&' : '?') + 'action=stock')
-        .then(function (r) { return r.json(); })
-        .then(function (j) {
-          if (!j || !j.ok) throw new Error('stock');
-          var dates = {};
-          Object.keys(j.dates).forEach(function (k) {
-            var items = {};
-            MENU.forEach(function (m) { items[m.id] = Number(j.dates[k].items[m.name]) || 0; });
-            dates[k] = { opened: !!j.dates[k].opened, preorder: !!j.dates[k].preorder, items: items };
-          });
-          return { dates: dates };
-        });
-    },
     placeOrder: function (o) {
       if (!LIVE) return Promise.resolve(mockPlace(o));
       var named = {};
@@ -389,14 +356,6 @@ var API_URL = 'https://script.google.com/macros/s/AKfycbwe8NpmnK7J2YUmmgVbrTK9FJ
     }
   };
   function mockPlace(o) {
-    var d = stock.dates[o.date];
-    if (!d || !d.opened) return { ok: false, error: 'DATE_CLOSED' };
-    var short = [];
-    Object.keys(o.items).forEach(function (id) {
-      if (!d.preorder && o.items[id] > (d.items[id] || 0)) short.push({ name: BY_ID[id].name, requested: o.items[id], available: d.items[id] || 0 });
-    });
-    if (short.length) return { ok: false, error: 'INSUFFICIENT', shortages: short };
-    Object.keys(o.items).forEach(function (id) { d.items[id] -= o.items[id]; });
     var rec = { id: ++seq, created: Date.now(), date: o.date, time: o.time, zone: o.zone, name: o.name, phone: o.phone, addr: o.addr, note: o.note, items: JSON.parse(JSON.stringify(o.items)), sent: false };
     orders.push(rec);
     return { ok: true, orderId: 'ทดสอบ-' + rec.id };
@@ -404,63 +363,64 @@ var API_URL = 'https://script.google.com/macros/s/AKfycbwe8NpmnK7J2YUmmgVbrTK9FJ
 
   /* ---------- customer: selects ---------- */
   (function () {
-    var t = '<option value="">เลือกเวลา</option>';
-    for (var h = 9; h <= 21; h++) {
-      ['00', '30'].forEach(function (m) {
-        if (h === 21 && m === '30') return;
-        t += '<option value="' + pad2(h) + ':' + m + '">' + pad2(h) + ':' + m + ' น.</option>';
-      });
-    }
-    $('f-time').innerHTML = t;
     var z = '<option value="">เลือกพื้นที่ส่ง</option>';
     ZONE_ORDER.forEach(function (id) { z += '<option value="' + id + '">' + esc(ZONES[id].name) + ' (+' + baht(ZONES[id].fee) + ')</option>'; });
     $('f-zone').innerHTML = z;
   })();
 
+  /* ---------- time slots (today needs a lead time) ---------- */
+  var LEAD_MIN = 60;   // today: earliest slot = now + 60 minutes
+  function slotsFor(k) {
+    var out = [], limit = 0;
+    if (k === dayKey(0)) limit = Date.now() + LEAD_MIN * 60000;
+    for (var h = 9; h <= 21; h++) {
+      ['00', '30'].forEach(function (m) {
+        if (h === 21 && m === '30') return;
+        var p = k.split('-').map(Number);
+        if (limit && new Date(p[0], p[1] - 1, p[2], h, Number(m)).getTime() < limit) return;
+        out.push(pad2(h) + ':' + m);
+      });
+    }
+    return out;
+  }
+  function buildTimes() {
+    var keep = $('f-time').value, k = $('f-date').value, sl = slotsFor(k);
+    var t = '<option value="">เลือกเวลา</option>';
+    sl.forEach(function (v) { t += '<option value="' + v + '">' + v + ' น.</option>'; });
+    $('f-time').innerHTML = t;
+    if (keep && sl.indexOf(keep) >= 0) $('f-time').value = keep;
+    $('time-sub').textContent = k === dayKey(0)
+      ? 'ส่งวันนี้ต้องสั่งก่อนเวลาส่งอย่างน้อย ' + (LEAD_MIN / 60) + ' ชั่วโมง (ส่งได้ 09:00 ถึง 21:00 น.)'
+      : 'ส่งได้ตั้งแต่ 09:00 ถึง 21:00 น.';
+  }
+
   function buildDates(keep) {
     var html = '', first = '';
-    for (var i = 1; i <= 7; i++) {
-      var k = dayKey(i), d = stock.dates[k], open = !!(d && d.opened);
+    for (var i = 0; i <= 7; i++) {
+      var k = dayKey(i), open = slotsFor(k).length > 0;
       if (open && !first) first = k;
-      html += '<option value="' + k + '"' + (open ? '' : ' disabled') + '>' + esc(label(k)) + (open ? '' : ' (ยังไม่เปิดรับ)') + '</option>';
+      html += '<option value="' + k + '"' + (open ? '' : ' disabled') + '>' + esc(label(k)) + (i === 0 ? ' (วันนี้)' : '') + (open ? '' : ' (เลยเวลาสั่งแล้ว)') + '</option>';
     }
     $('f-date').innerHTML = html;
-    var want = (keep && stock.dates[keep] && stock.dates[keep].opened) ? keep : first;
+    var want = (keep && slotsFor(keep).length) ? keep : first;
     if (want) $('f-date').value = want;
     $('submit').disabled = !first;
-    $('date-sub').textContent = first ? 'สั่งล่วงหน้าได้ 7 วัน วันที่ยังไม่เปิดรับจะเลือกไม่ได้' : 'ตอนนี้ยังไม่เปิดรับออเดอร์ในช่วง 7 วันข้างหน้า';
+    buildTimes();
   }
-  function remainingOf(id) {
-    var d = stock && stock.dates[$('f-date').value];
-    return d && d.opened ? (d.items[id] || 0) : 0;
-  }
-  var PRE_MAX = 20;   // per item, per order, on pre-order days
-  function isPre() { var d = stock && stock.dates[$('f-date').value]; return !!(d && d.opened && d.preorder); }
-  function capOf(id) { return isPre() ? PRE_MAX : remainingOf(id); }
-  function clampCart() {
-    var changed = false;
-    MENU.forEach(function (m) {
-      var q = cart[m.id] || 0; if (!q) return;
-      var r = capOf(m.id);
-      if (q > r) { changed = true; if (r > 0) cart[m.id] = r; else delete cart[m.id]; }
-    });
-    $('stock-note').textContent = changed ? 'ปรับจำนวนตามของที่เหลือของวันที่เลือกแล้ว' : '';
-  }
+  var MAX_QTY = 20;   // per item, per order
 
   /* ---------- customer: menu ---------- */
   function renderMenu() {
-    if (!stock) { $('menu').innerHTML = '<p class="sub">กำลังโหลดสต็อก...</p>'; updateBar(); return; }
-    $('menu-sub').textContent = isPre() ? 'วันนี้รับสั่งล่วงหน้า ถ้าของไม่พอร้านจะทำเพิ่มให้ตามออเดอร์' : 'จำนวนที่เหลือเป็นของวันที่เลือกด้านบน';
     var html = '', lastGroup = '';
     MENU.forEach(function (m) {
       if (m.group !== lastGroup) { html += '<div class="group-title">' + esc(m.group) + '</div>'; lastGroup = m.group; }
-      var q = cart[m.id] || 0, r = remainingOf(m.id), pre = isPre(), out = !pre && r <= 0, cap = capOf(m.id);
-      html += '<div class="item' + (q ? ' on' : '') + (out ? ' out' : '') + '" data-id="' + m.id + '">' +
+      var q = cart[m.id] || 0;
+      html += '<div class="item' + (q ? ' on' : '') + '" data-id="' + m.id + '">' +
         '<div class="info"><div class="name">' + esc(m.name) + '</div>' +
-        '<div class="price">' + baht(m.price) + ' ต่อชิ้น · <span class="stock ' + (out ? 'out' : (r <= 0 ? 'pre' : (r <= 3 ? 'low' : ''))) + '">' + (out ? 'หมด' : (r <= 0 ? 'สั่งล่วงหน้า' : 'เหลือ ' + r + ' ชิ้น')) + '</span></div></div>' +
+        '<div class="price">' + baht(m.price) + ' ต่อชิ้น</div></div>' +
         '<div class="stepper"><button type="button" data-act="dec" aria-label="ลด ' + esc(m.name) + '"' + (q ? '' : ' disabled') + '>−</button>' +
         '<span class="qty" aria-live="polite">' + q + '</span>' +
-        '<button type="button" data-act="inc" aria-label="เพิ่ม ' + esc(m.name) + '"' + (q >= cap ? ' disabled' : '') + '>+</button></div></div>';
+        '<button type="button" data-act="inc" aria-label="เพิ่ม ' + esc(m.name) + '"' + (q >= MAX_QTY ? ' disabled' : '') + '>+</button></div></div>';
     });
     $('menu').innerHTML = html;
     updateBar();
@@ -479,19 +439,17 @@ var API_URL = 'https://script.google.com/macros/s/AKfycbwe8NpmnK7J2YUmmgVbrTK9FJ
     $('price').innerHTML = priceHtml(c, zone);
   }
   $('menu').addEventListener('click', function (e) {
-    if (e.target.id === 'retry') { load(); return; }
     var btn = e.target.closest('button[data-act]'); if (!btn || btn.disabled) return;
     var row = btn.closest('.item'), id = row.getAttribute('data-id');
     var q = cart[id] || 0;
-    q = btn.getAttribute('data-act') === 'inc' ? Math.min(q + 1, capOf(id)) : Math.max(q - 1, 0);
+    q = btn.getAttribute('data-act') === 'inc' ? Math.min(q + 1, MAX_QTY) : Math.max(q - 1, 0);
     if (q) cart[id] = q; else delete cart[id];
-    $('stock-note').textContent = '';
     renderMenu();
     var again = $('menu').querySelector('.item[data-id="' + id + '"] button[data-act="' + btn.getAttribute('data-act') + '"]');
     if (again && !again.disabled) again.focus();
   });
   $('f-zone').addEventListener('change', updateBar);
-  $('f-date').addEventListener('change', function () { clampCart(); renderMenu(); });
+  $('f-date').addEventListener('change', buildTimes);
 
   function itemsText(items) {
     return MENU.filter(function (m) { return items[m.id]; })
@@ -500,26 +458,18 @@ var API_URL = 'https://script.google.com/macros/s/AKfycbwe8NpmnK7J2YUmmgVbrTK9FJ
 
   /* ---------- customer: load + submit ---------- */
   function load(keepDate) {
-    stock = null; renderMenu();
-    return api.getStock().then(function (s) {
-      stock = s; buildDates(keepDate); clampCart(); renderMenu(); renderAdmin();
-    }).catch(function () {
-      $('menu').innerHTML = '<p class="err">โหลดสต็อกไม่ได้ ตรวจอินเทอร์เน็ตแล้วลองใหม่</p><button class="btn small" type="button" id="retry">ลองใหม่</button>';
-    });
+    buildDates(keepDate); renderMenu(); renderAdmin();
   }
   function setMsg(text, info) { var e = $('err'); e.textContent = text; e.classList.toggle('info', !!info); }
   function failText(res) {
-    if (res && res.error === 'INSUFFICIENT' && res.shortages) {
-      return 'ของไม่พอ: ' + res.shortages.map(function (s) { return s.name + ' เหลือ ' + s.available + ' ชิ้น'; }).join(', ') + ' กรุณาปรับจำนวนแล้วส่งใหม่';
-    }
-    if (res && res.error === 'DATE_CLOSED') return 'วันที่เลือกยังไม่เปิดรับออเดอร์ กรุณาเลือกวันอื่น';
     if (res && res.message) return res.message;
+    if (res && res.error === 'BAD_TIME') return 'เวลาจัดส่งที่เลือกไม่ได้ กรุณาเลือกเวลาใหม่';
     return 'ส่งออเดอร์ไม่สำเร็จ ลองใหม่อีกครั้ง';
   }
 
   $('form').addEventListener('submit', function (e) {
     e.preventDefault();
-    if (busy || !stock) return;
+    if (busy) return;
     var c = calc(cart, $('f-zone').value);
     var date = $('f-date').value, time = $('f-time').value, zone = $('f-zone').value;
     var name = $('f-name').value.trim(), phone = $('f-phone').value.trim(), addr = $('f-addr').value.trim();
@@ -571,14 +521,6 @@ var API_URL = 'https://script.google.com/macros/s/AKfycbwe8NpmnK7J2YUmmgVbrTK9FJ
   function renderAdmin() {
     if (LIVE) return;
     $('badge').textContent = orders.filter(function (o) { return !o.sent; }).length;
-
-    $('sheet-stock').innerHTML = mockBatches.map(function (b) {
-      return '<div class="bh">ล็อตที่ใช้ส่งวัน ' + b.dates.map(label).map(esc).join(', ') + '</div>' +
-        MENU.map(function (m) {
-          var v = b.items[m.id] || 0;
-          return '<div class="make-row"><span>' + esc(m.name) + '</span><b>' + (v < 0 ? '−' + (-v) + ' ชิ้น (ต้องทำเพิ่ม)' : v + ' ชิ้น') + '</b></div>';
-        }).join('');
-    }).join('');
 
     var dates = []; orders.forEach(function (o) { if (dates.indexOf(o.date) < 0) dates.push(o.date); });
     dates.sort();
