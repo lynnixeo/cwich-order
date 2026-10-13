@@ -291,11 +291,12 @@ var API_URL = 'https://script.google.com/macros/s/AKfycbwe8NpmnK7J2YUmmgVbrTK9FJ
     { id: 'se', kind: 'sw', group: 'แซนวิช', name: 'ไส้กรอก+ไข่', price: SW },
     { id: 'oj', kind: 'dr', group: 'เครื่องดื่ม', name: 'น้ำส้ม', price: OJ }
   ];
-  var ZONES = { gs: { name: 'กังสดาล', fee: 5 }, mo: { name: 'หลังมอ', fee: 10 }, city: { name: 'ในเมือง', fee: 15 } };
-  var ZONE_ORDER = ['gs', 'mo', 'city'];
+  var ZONES = { kkuic: { name: 'KKUIC', fee: 0 }, gs: { name: 'กังสดาล', fee: 5 }, mo: { name: 'หลังมอ', fee: 10 }, city: { name: 'ในเมือง', fee: 15 } };
+  var ZONE_ORDER = ['kkuic', 'gs', 'mo', 'city'];
   var BY_ID = {}; MENU.forEach(function (m) { BY_ID[m.id] = m; });
 
   function esc(s) { return String(s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+  function feeText(f) { return f ? '+' + baht(f) : 'ฟรี'; }
   function baht(n) { return '฿' + String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ','); }
   function $(id) { return document.getElementById(id); }
   function pad2(n) { return String(n).padStart(2, '0'); }
@@ -334,7 +335,7 @@ var API_URL = 'https://script.google.com/macros/s/AKfycbwe8NpmnK7J2YUmmgVbrTK9FJ
     if (c.sw) h += line('แซนวิช ' + c.sw + ' × ' + baht(SW), baht(c.sw * SW));
     if (c.oj) h += line('น้ำส้ม ' + c.oj + ' × ' + baht(OJ), baht(c.oj * OJ));
     if (c.duo) h += line('ส่วนลด Duo Set ' + c.duo + ' ชุด (ชุดละ ' + baht(DUO) + ')', '−' + baht(c.disc), 'disc');
-    if (ZONES[zoneId]) h += line('ค่าส่ง ' + ZONES[zoneId].name, '+' + baht(c.fee));
+    if (ZONES[zoneId]) h += line('ค่าส่ง ' + ZONES[zoneId].name, feeText(c.fee));
     else h += line('ค่าส่ง', 'เลือกพื้นที่ส่งก่อน', 'muted');
     h += line('รวมทั้งหมด', baht(c.total), 'total');
     return h;
@@ -371,7 +372,7 @@ var API_URL = 'https://script.google.com/macros/s/AKfycbwe8NpmnK7J2YUmmgVbrTK9FJ
   /* ---------- customer: selects ---------- */
   (function () {
     var z = '<option value="">เลือกพื้นที่ส่ง</option>';
-    ZONE_ORDER.forEach(function (id) { z += '<option value="' + id + '">' + esc(ZONES[id].name) + ' (+' + baht(ZONES[id].fee) + ')</option>'; });
+    ZONE_ORDER.forEach(function (id) { z += '<option value="' + id + '">' + esc(ZONES[id].name) + ' (' + (ZONES[id].fee ? '+' + baht(ZONES[id].fee) : 'ไม่มีค่าส่ง') + ')</option>'; });
     $('f-zone').innerHTML = z;
   })();
 
@@ -440,7 +441,7 @@ var API_URL = 'https://script.google.com/macros/s/AKfycbwe8NpmnK7J2YUmmgVbrTK9FJ
     else {
       small = c.n + ' ชิ้น';
       if (c.duo) small += ' · Duo Set ' + c.duo + ' ชุด';
-      small += ZONES[zone] ? ' · ค่าส่ง ' + baht(c.fee) : ' · ยังไม่ได้เลือกพื้นที่ส่ง';
+      small += ZONES[zone] ? (c.fee ? ' · ค่าส่ง ' + baht(c.fee) : ' · ไม่มีค่าส่ง') : ' · ยังไม่ได้เลือกพื้นที่ส่ง';
     }
     $('bar-count').textContent = small;
     $('price').innerHTML = priceHtml(c, zone);
