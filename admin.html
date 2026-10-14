@@ -177,6 +177,11 @@ pre.sumtext { margin: 12px 0 0; padding: 10px; background: var(--bg); border: 1p
 .order .row .btn.done { background: var(--leaf); color: #fff; }
 .order .contact { color: var(--muted); font-size: 13px; overflow-wrap: anywhere; }
 .toggle { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }
+.order.editing h3 { font-size: 17px; margin-bottom: 4px; }
+.qtys { display: grid; gap: 6px; }
+.qrow { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-weight: 400; }
+.qrow input { width: 84px; text-align: center; }
+input[type="date"], input[type="number"] { width: 100%; padding: 11px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); }
 .toggle input { width: 18px; height: 18px; accent-color: var(--accent); }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .order .row .btn.done { background: var(--leaf); color: #0d1a0f; } }
 </style>
@@ -232,7 +237,10 @@ var API_URL = 'https://script.google.com/macros/s/AKfycbwe8NpmnK7J2YUmmgVbrTK9FJ
   function label(k) { var p = k.split('-').map(Number); return new Date(p[0], p[1] - 1, p[2]).toLocaleDateString('th-TH', { weekday: 'short', day: 'numeric', month: 'short' }); }
   function store(k, v) { try { if (v === null) localStorage.removeItem(k); else if (v !== undefined) localStorage.setItem(k, v); else return localStorage.getItem(k); } catch (e) { return null; } }
 
-  var pin = '', orders = [], day = 'all', busy = {}, timer = null;
+  var MENU_NAMES = ['ปูอัด+แฮม', 'ปูอัด+ไส้กรอก', 'ปูอัด+ไข่', 'แฮม+ไส้กรอก', 'แฮม+ไข่', 'ไส้กรอก+ไข่', 'น้ำส้ม'];
+  var PRICE = { sw: 35, dr: 30, duo: 59 };
+  var ZONES = { kkuic: { name: 'KKUIC', fee: 0 }, gs: { name: 'กังสดาล', fee: 5 }, mo: { name: 'หลังมอ', fee: 10 }, city: { name: 'ในเมือง', fee: 15 } };
+  var pin = '', orders = [], day = 'all', busy = {}, timer = null, editing = null;
 
   function call(payload) {
     payload.pin = pin;
@@ -272,7 +280,7 @@ var API_URL = 'https://script.google.com/macros/s/AKfycbwe8NpmnK7J2YUmmgVbrTK9FJ
       if (fromLogin) {
         $('login').hidden = true; $('board').hidden = false;
         day = hasDay(todayKey()) ? todayKey() : 'all';
-        clearInterval(timer); timer = setInterval(function () { if (!document.hidden) load(); }, 60000);
+        clearInterval(timer); timer = setInterval(function () { if (!document.hidden && !editing) load(); }, 60000);
       }
       render();
       return true;
@@ -283,7 +291,7 @@ var API_URL = 'https://script.google.com/macros/s/AKfycbwe8NpmnK7J2YUmmgVbrTK9FJ
     });
   }
   function hasDay(k) { return orders.some(function (o) { return o.date === k; }); }
-  $('refresh').addEventListener('click', function () { load(); });
+  $('refresh').addEventListener('click', function () { if (editing) { $('boardErr').textContent = 'กำลังแก้ไขออเดอร์อยู่ กดบันทึกหรือยกเลิกก่อน'; return; } load(); });
 
   /* ---------- render ---------- */
   function parseItems(s) {
@@ -320,6 +328,7 @@ var API_URL = 'https://script.google.com/macros/s/AKfycbwe8NpmnK7J2YUmmgVbrTK9FJ
     var html = '', last = '';
     list.forEach(function (o) {
       if (o.date !== last) { html += '<div class="day-h">ส่ง ' + esc(o.date ? label(o.date) : '-') + '</div>'; last = o.date; }
+      if (editing === o.id) { html += editorHtml(o); return; }
       html += '<div class="card order' + (o.sent ? ' sent' : '') + '" data-id="' + esc(o.id) + '">' +
         '<div class="meta"><b class="time">' + esc(o.time) + ' น.</b><span class="pill zone">' + esc(o.zone) + '</span><span class="tel">' + esc(o.id) + '</span></div>' +
         '<div class="top"><span class="who">' + esc(o.name) + '</span></div>' +
@@ -329,14 +338,81 @@ var API_URL = 'https://script.google.com/macros/s/AKfycbwe8NpmnK7J2YUmmgVbrTK9FJ
         (o.note ? '<div class="note">หมายเหตุ: ' + esc(o.note) + '</div>' : '') +
         '<div class="placed">สั่งเมื่อ ' + esc(o.placed) + '</div>' +
         '<div class="row"><span class="sum">' + baht(o.total) + ' (ค่าส่ง ' + baht(o.fee) + ') · ' + (o.sent ? '<span class="pill ok">ส่งแล้ว</span>' : '<span class="pill">รอส่ง</span>') + '</span>' +
-        '<button class="btn small' + (o.sent ? ' ghost' : ' done') + '" type="button" data-act="toggle"' + (busy[o.id] ? ' disabled' : '') + '>' + (busy[o.id] ? 'กำลังบันทึก...' : (o.sent ? 'ยกเลิกสถานะส่งแล้ว' : '✓ ส่งแล้ว')) + '</button></div></div>';
+        '<span class="actions"><button class="btn small ghost" type="button" data-act="edit"' + (busy[o.id] || editing ? ' disabled' : '') + '>แก้ไข</button>' +
+        '<button class="btn small' + (o.sent ? ' ghost' : ' done') + '" type="button" data-act="toggle"' + (busy[o.id] ? ' disabled' : '') + '>' + (busy[o.id] ? 'กำลังบันทึก...' : (o.sent ? 'ยกเลิกสถานะส่งแล้ว' : '✓ ส่งแล้ว')) + '</button></span></div></div>';
     });
     $('orders').innerHTML = html || '<div class="card empty">ไม่มีออเดอร์ในตัวกรองนี้</div>';
   }
   $('chips').addEventListener('click', function (e) { var b = e.target.closest('.chip'); if (!b) return; day = b.getAttribute('data-day'); render(); });
   $('onlyPending').addEventListener('change', render);
 
+  /* ---------- edit an order ---------- */
+  function editorHtml(o) {
+    var qty = {}; parseItems(o.items).forEach(function (it) { qty[it.name] = it.qty; });
+    var times = [], cur = o.time;
+    for (var h = 9; h <= 21; h++) ['00', '30'].forEach(function (m) { if (!(h === 21 && m === '30')) times.push(pad2(h) + ':' + m); });
+    if (cur && times.indexOf(cur) < 0) times.push(cur);
+    var zoneId = o.zoneId || '';
+    return '<div class="card order editing" data-id="' + esc(o.id) + '">' +
+      '<h3>แก้ไขออเดอร์ ' + esc(o.id) + '</h3>' +
+      '<div class="cols">' +
+      '<div class="field"><label for="ed-date">วันที่ส่ง</label><input type="date" id="ed-date" class="ed" value="' + esc(o.date) + '"></div>' +
+      '<div class="field"><label for="ed-time">เวลาส่ง</label><select id="ed-time" class="ed">' + times.map(function (t) { return '<option value="' + t + '"' + (t === cur ? ' selected' : '') + '>' + t + ' น.</option>'; }).join('') + '</select></div>' +
+      '<div class="field"><label for="ed-zone">พื้นที่</label><select id="ed-zone" class="ed">' + Object.keys(ZONES).map(function (z) { return '<option value="' + z + '"' + (z === zoneId ? ' selected' : '') + '>' + esc(ZONES[z].name) + (ZONES[z].fee ? ' (+' + ZONES[z].fee + ')' : ' (ไม่มีค่าส่ง)') + '</option>'; }).join('') + '</select></div>' +
+      '<div class="field"><label for="ed-name">ชื่อ</label><input type="text" id="ed-name" class="ed" value="' + esc(o.name) + '"></div>' +
+      '<div class="field"><label for="ed-contact">ช่องทางติดต่อ</label><input type="text" id="ed-contact" class="ed" maxlength="60" value="' + esc(o.contact) + '"></div>' +
+      '</div>' +
+      '<div class="field"><label for="ed-addr">ที่อยู่</label><textarea id="ed-addr" class="ed">' + esc(o.addr) + '</textarea></div>' +
+      '<div class="field"><label for="ed-note">หมายเหตุ</label><input type="text" id="ed-note" class="ed" value="' + esc(o.note) + '"></div>' +
+      '<div class="field"><label>จำนวน</label><div class="qtys">' + MENU_NAMES.map(function (n, i) {
+        return '<label class="qrow"><span>' + esc(n) + '</span><input type="number" class="ed qty-in" data-name="' + esc(n) + '" min="0" max="99" inputmode="numeric" value="' + (qty[n] || 0) + '"></label>';
+      }).join('') + '</div></div>' +
+      '<div class="make-row net"><span>ยอดรวมใหม่</span><b id="ed-total">-</b></div>' +
+      '<p class="err" id="ed-err" role="alert"></p>' +
+      '<div class="actions"><button class="btn small" type="button" data-act="save">บันทึกการแก้ไข</button><button class="btn small ghost" type="button" data-act="cancel">ยกเลิก</button></div>' +
+      '<p class="sub" style="margin:8px 0 0">เมื่อบันทึก ระบบคิดราคาใหม่ แก้แถวในชีต และแจ้งไลน์ว่ามีการแก้ไข</p></div>';
+  }
+  function readEditor() {
+    var items = {};
+    [].forEach.call(document.querySelectorAll('.qty-in'), function (i) { var q = parseInt(i.value, 10); if (q > 0) items[i.getAttribute('data-name')] = Math.min(q, 99); });
+    return { date: $('ed-date').value, time: $('ed-time').value, zone: $('ed-zone').value, name: $('ed-name').value.trim(), phone: $('ed-contact').value.trim(), addr: $('ed-addr').value.trim(), note: $('ed-note').value.trim(), items: items };
+  }
+  function previewTotal() {
+    var el = $('ed-total'); if (!el) return;
+    var d = readEditor(), sw = 0, dr = 0;
+    Object.keys(d.items).forEach(function (n) { if (n === 'น้ำส้ม') dr += d.items[n]; else sw += d.items[n]; });
+    if (!sw && !dr) { el.textContent = 'ยังไม่ได้เลือกสินค้า'; return; }
+    var total = sw * PRICE.sw + dr * PRICE.dr - Math.min(sw, dr) * (PRICE.sw + PRICE.dr - PRICE.duo) + (ZONES[d.zone] ? ZONES[d.zone].fee : 0);
+    el.textContent = baht(total);
+  }
+  $('orders').addEventListener('input', function (e) { if (e.target.classList.contains('ed')) previewTotal(); });
+  $('orders').addEventListener('change', function (e) { if (e.target.classList.contains('ed')) previewTotal(); });
+
   $('orders').addEventListener('click', function (e) {
+    var a = e.target.closest('button[data-act]');
+    if (a && a.getAttribute('data-act') === 'edit' && !a.disabled) {
+      editing = a.closest('.order').getAttribute('data-id'); $('boardErr').textContent = ''; render(); previewTotal();
+      var f = $('ed-name'); if (f) f.focus();
+      return;
+    }
+    if (a && a.getAttribute('data-act') === 'cancel') { editing = null; render(); return; }
+    if (a && a.getAttribute('data-act') === 'save' && !a.disabled) {
+      var id = editing, d = readEditor(); d.action = 'admin_edit'; d.id = id;
+      if (!Object.keys(d.items).length) { $('ed-err').textContent = 'ใส่จำนวนอย่างน้อย 1 รายการ'; return; }
+      a.disabled = true; $('ed-err').textContent = 'กำลังบันทึก...';
+      call(d).then(function (res) {
+        if (res && res.ok && res.order) {
+          orders = orders.map(function (x) { return x.id === id ? res.order : x; });
+          editing = null;
+          if (day !== 'all') day = res.order.date || 'all';
+          render();
+        } else {
+          a.disabled = false; $('ed-err').textContent = (res && res.message) || 'บันทึกไม่สำเร็จ ลองใหม่อีกครั้ง';
+          if (res && res.error === 'BAD_PIN') { store('cw_pin', null); showLogin(res.message); }
+        }
+      }).catch(function () { a.disabled = false; $('ed-err').textContent = 'เชื่อมต่อไม่ได้ ยังไม่ได้บันทึก ลองใหม่อีกครั้ง'; });
+      return;
+    }
     var b = e.target.closest('button[data-act="toggle"]'); if (!b || b.disabled) return;
     var id = b.closest('.order').getAttribute('data-id');
     var o = orders.filter(function (x) { return x.id === id; })[0]; if (!o || busy[id]) return;
