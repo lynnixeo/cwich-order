@@ -291,8 +291,8 @@ var API_URL = 'https://script.google.com/macros/s/AKfycbwe8NpmnK7J2YUmmgVbrTK9FJ
     { id: 'se', kind: 'sw', group: 'แซนวิช', name: 'ไส้กรอก+ไข่', price: SW },
     { id: 'oj', kind: 'dr', group: 'เครื่องดื่ม', name: 'น้ำส้ม', price: OJ }
   ];
-  var ZONES = { kkuic: { name: 'KKUIC', fee: 0 }, gs: { name: 'กังสดาล', fee: 5 }, mo: { name: 'หลังมอ', fee: 10 }, city: { name: 'ในเมือง', fee: 15 } };
-  var ZONE_ORDER = ['kkuic', 'gs', 'mo', 'city'];
+  var ZONES = { kkuic: { name: 'KKUIC', fee: 0 }, inmo: { name: 'ในมอ', fee: 0 }, gs: { name: 'กังสดาล', fee: 5 }, mo: { name: 'หลังมอ', fee: 10 }, nm: { name: 'โนนม่วง', fee: 15 }, cb: { name: 'โคลัมโบ', fee: 15 }, city: { name: 'ในเมือง', fee: 15 } };
+  var ZONE_ORDER = ['kkuic', 'inmo', 'gs', 'mo', 'nm', 'cb', 'city'];
   var BY_ID = {}; MENU.forEach(function (m) { BY_ID[m.id] = m; });
 
   function esc(s) { return String(s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
