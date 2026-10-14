@@ -239,7 +239,7 @@ var API_URL = 'https://script.google.com/macros/s/AKfycbwe8NpmnK7J2YUmmgVbrTK9FJ
 
   var MENU_NAMES = ['ปูอัด+แฮม', 'ปูอัด+ไส้กรอก', 'ปูอัด+ไข่', 'แฮม+ไส้กรอก', 'แฮม+ไข่', 'ไส้กรอก+ไข่', 'น้ำส้ม'];
   var PRICE = { sw: 35, dr: 30, duo: 59 };
-  var ZONES = { kkuic: { name: 'KKUIC', fee: 0 }, gs: { name: 'กังสดาล', fee: 5 }, mo: { name: 'หลังมอ', fee: 10 }, city: { name: 'ในเมือง', fee: 15 } };
+  var ZONES = { kkuic: { name: 'KKUIC', fee: 0 }, inmo: { name: 'ในมอ', fee: 0 }, gs: { name: 'กังสดาล', fee: 5 }, mo: { name: 'หลังมอ', fee: 10 }, nm: { name: 'โนนม่วง', fee: 15 }, cb: { name: 'โคลัมโบ', fee: 15 }, city: { name: 'ในเมือง', fee: 15 } };
   var pin = '', orders = [], day = 'all', busy = {}, timer = null, editing = null;
 
   function call(payload) {
@@ -406,6 +406,7 @@ var API_URL = 'https://script.google.com/macros/s/AKfycbwe8NpmnK7J2YUmmgVbrTK9FJ
           editing = null;
           if (day !== 'all') day = res.order.date || 'all';
           render();
+          if (res.lineOk === false) $('boardErr').textContent = 'บันทึกการแก้ไขแล้ว แต่แจ้งไลน์ไม่สำเร็จ: ' + (res.lineError || 'ไม่ทราบสาเหตุ');
         } else {
           a.disabled = false; $('ed-err').textContent = (res && res.message) || 'บันทึกไม่สำเร็จ ลองใหม่อีกครั้ง';
           if (res && res.error === 'BAD_PIN') { store('cw_pin', null); showLogin(res.message); }
@@ -420,7 +421,7 @@ var API_URL = 'https://script.google.com/macros/s/AKfycbwe8NpmnK7J2YUmmgVbrTK9FJ
     busy[id] = true; render();
     call({ action: 'admin_status', id: id, sent: want }).then(function (res) {
       delete busy[id];
-      if (res && res.ok) { o.sent = want; $('boardErr').textContent = ''; }
+      if (res && res.ok) { o.sent = want; $('boardErr').textContent = res.lineOk === false ? 'บันทึกว่าส่งแล้ว แต่แจ้งไลน์ไม่สำเร็จ: ' + (res.lineError || 'ไม่ทราบสาเหตุ') : ''; }
       else $('boardErr').textContent = (res && res.message) || 'บันทึกไม่สำเร็จ ลองใหม่อีกครั้ง';
       render();
     }).catch(function () { delete busy[id]; $('boardErr').textContent = 'เชื่อมต่อไม่ได้ ยังไม่ได้บันทึก ลองใหม่อีกครั้ง'; render(); });
